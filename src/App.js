@@ -2,7 +2,7 @@ import * as React from 'react';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {Entity, ModelGraphics, Viewer} from 'resium'
 import './App.css';
-import {Cartesian3, CesiumTerrainProvider, Color, Ion, IonResource, Material} from 'cesium'
+import {Cartesian3, CesiumTerrainProvider, Ion, IonResource} from 'cesium'
 
 Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjMjk3OGRkNS0zZTZjLTQyZGYtYjAzNy1lYTk5NmY3NDkyZTMiLCJpZCI6MzMxMzksInNjb3BlcyI6WyJhc3IiLCJnYyJdLCJpYXQiOjE1OTgwNjc1ODh9.KjJzjblyvrJlF0WkZZznyR6FXfNZY432yc19DtT1Ozc'
 
@@ -72,7 +72,7 @@ const useAirTrafficData = (visible) => {
                     setData(cartesians);
                 }
             )
-    }, [data]);
+    }, []);
 
     useEffect(() => {
         if (visible && !intervalRef.current) {
@@ -94,10 +94,6 @@ const useAirTrafficData = (visible) => {
     return {data};
 };
 
-const GLOW_MATERIAL = Material.fromType(Material.PolylineGlowType, {
-    glowPower: 0.1,
-    color: new Color(1.0, 0.5, 0.0, 1.0)
-});
 
 const TERRAIN_PROVIDER = new CesiumTerrainProvider({
     url: IonResource.fromAssetId(1),
@@ -105,26 +101,28 @@ const TERRAIN_PROVIDER = new CesiumTerrainProvider({
 
 const userAgent = navigator.userAgent.toLowerCase()
 
+const Model = React.memo(() => (
+    <ModelGraphics uri={"/banana.gltf"} minimumPixelSize={200} maximumPixelSize={500}/>
+))
+
 function App() {
     const ref = useRef(null);
     const {data} = useAirTrafficData(true)
     React.useEffect(() => {
-        console.log(ref.current)
         ref.current.cesiumElement.animation.container.style.visibility = 'hidden';
         ref.current.cesiumElement.timeline.container.style.visibility = 'hidden';
         ref.current.cesiumElement.scene.globe.enableLighting = !userAgent.includes('android');
         ref.current.cesiumElement.forceResize();
     }, [])
 
-
     return (
         <Viewer ref={ref} style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0}} baseLayerPicker={false}
                 requestRenderMode={true}
                 terrainProvider={TERRAIN_PROVIDER}
         >
-            {data.map(position => (
-                <Entity position={position} key={position.latitude + position.longitude}>
-                    <ModelGraphics uri={"/banana.gltf"} minimumPixelSize={200} maximumPixelSize={500}/>
+            {data.map((position,i) => (
+                <Entity position={position} key={`${i} ${position.x + position.y + position.z}`}>
+                    <Model/>
                 </Entity>
             ))}
         </Viewer>
