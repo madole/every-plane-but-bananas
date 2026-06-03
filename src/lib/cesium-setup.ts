@@ -1,4 +1,5 @@
 import {
+  createWorldImageryAsync,
   EllipsoidTerrainProvider,
   ImageryLayer,
   Ion,
@@ -50,33 +51,34 @@ export function createFallbackBaseLayer(): ImageryLayer {
   )
 }
 
-export function attachImageryFallback(viewer: CesiumViewer): () => void {
-  const baseLayer = viewer.imageryLayers.get(0)
-  if (!baseLayer) {
-    return () => undefined
+async function createIonImageryLayer(): Promise<ImageryLayer> {
+  const provider = await createWorldImageryAsync()
+  return new ImageryLayer(provider)
+}
+
+function setGlobeImagery(viewer: CesiumViewer, layer: ImageryLayer) {
+  viewer.imageryLayers.removeAll()
+  viewer.imageryLayers.add(layer)
+  viewer.scene.requestRender()
+}
+
+/**
+ * Start with OSM (set on Viewer), upgrade to Ion world imagery when configured.
+ * Avoids default Viewer imagery whose provider may lack errorEvent in Cesium 1.142.
+ */
+export async function applyGlobeImagery(viewer: CesiumViewer): Promise<void> {
+  if (!Ion.defaultAccessToken) {
+    return
   }
 
-  let switched = false
-
-  const onError = (error: unknown) => {
-    if (switched) {
-      return
-    }
-
-    switched = true
+  try {
+    const ionLayer = await createIonImageryLayer()
+    setGlobeImagery(viewer, ionLayer)
+    log.info('Applied Ion world imagery')
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
-    log.warn('Ion imagery failed; switching to OpenStreetMap fallback', {
+    log.warn('Ion imagery unavailable; keeping OpenStreetMap fallback', {
       message,
     })
-
-    viewer.imageryLayers.removeAll()
-    viewer.imageryLayers.add(createFallbackBaseLayer())
-    viewer.scene.requestRender()
-  }
-
-  baseLayer.imageryProvider.errorEvent.addEventListener(onError)
-
-  return () => {
-    baseLayer.imageryProvider.errorEvent.removeEventListener(onError)
   }
 }

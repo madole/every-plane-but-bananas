@@ -30,7 +30,7 @@ vi.mock('../lib/cesium-setup', () => ({
   configureCesiumIon: vi.fn(() => true),
   createTerrainProvider: vi.fn(() => Promise.resolve({})),
   createFallbackBaseLayer: vi.fn(() => ({})),
-  attachImageryFallback: vi.fn(() => () => undefined),
+  applyGlobeImagery: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('cesium', () => ({

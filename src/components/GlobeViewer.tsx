@@ -7,8 +7,8 @@ import { AircraftStatusOverlay } from './AircraftStatusOverlay'
 import { BananaAircraftLayer } from './BananaAircraftLayer'
 import { loadCachedAircraft, saveCachedAircraft } from '../lib/aircraft-cache'
 import {
+  applyGlobeImagery,
   configureCesiumIon,
-  attachImageryFallback,
   createFallbackBaseLayer,
   createTerrainProvider,
 } from '../lib/cesium-setup'
@@ -29,8 +29,8 @@ function createViewerTerrainProvider() {
   return createTerrainProvider()
 }
 
-function createViewerFallbackBaseLayer() {
-  return hasIonToken ? undefined : createFallbackBaseLayer()
+function createViewerBaseLayer() {
+  return createFallbackBaseLayer()
 }
 
 function readInitialCache() {
@@ -201,17 +201,15 @@ function configureViewer(
     })
   })
 
+  void applyGlobeImagery(viewer)
+
   log.info('Cesium viewer configured', {
     hasIonToken,
     enableLighting: viewer.scene.globe.enableLighting,
   })
 
-  const cleanupImageryFallback = hasIonToken
-    ? attachImageryFallback(viewer)
-    : () => undefined
-
   if (!container || typeof ResizeObserver === 'undefined') {
-    return cleanupImageryFallback
+    return
   }
 
   const resizeObserver = new ResizeObserver(() => {
@@ -222,17 +220,19 @@ function configureViewer(
 
   return () => {
     resizeObserver.disconnect()
-    cleanupImageryFallback()
   }
 }
 
 export function GlobeViewer() {
   const ref = useRef<CesiumComponentRef<CesiumViewer>>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [creditContainer, setCreditContainer] = useState<HTMLDivElement | null>(
+    null,
+  )
   const { positions, lastUpdatedAt, isUsingCache } = useAirTrafficData(true)
   const [viewer, setViewer] = useState<CesiumViewer | undefined>(undefined)
   const terrainProvider = useMemo(() => createViewerTerrainProvider(), [])
-  const fallbackBaseLayer = useMemo(() => createViewerFallbackBaseLayer(), [])
+  const baseLayer = useMemo(() => createViewerBaseLayer(), [])
   const globeWarning = useMemo(
     () =>
       hasIonToken
@@ -263,21 +263,25 @@ export function GlobeViewer() {
 
   return (
     <div ref={containerRef} className="globe-viewer">
-      <Viewer
-        ref={ref}
-        full
-        animation={false}
-        timeline={false}
-        baseLayerPicker={false}
-        geocoder={false}
-        homeButton={false}
-        navigationHelpButton={false}
-        sceneModePicker={false}
-        terrainProvider={terrainProvider}
-        baseLayer={fallbackBaseLayer}
-      >
-        <BananaAircraftLayer viewer={viewer} positions={positions} />
-      </Viewer>
+      <div ref={setCreditContainer} className="cesium-credit-container" />
+      {creditContainer ? (
+        <Viewer
+          ref={ref}
+          full
+          animation={false}
+          timeline={false}
+          baseLayerPicker={false}
+          geocoder={false}
+          homeButton={false}
+          navigationHelpButton={false}
+          sceneModePicker={false}
+          terrainProvider={terrainProvider}
+          baseLayer={baseLayer}
+          creditContainer={creditContainer}
+        >
+          <BananaAircraftLayer viewer={viewer} positions={positions} />
+        </Viewer>
+      ) : null}
       <AircraftStatusOverlay
         aircraftCount={positions.length}
         lastUpdatedAt={lastUpdatedAt}
