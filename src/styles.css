@@ -21,6 +21,10 @@ body {
   height: 100vh;
 }
 
+.globe-viewer--loading {
+  background: #0b0e12;
+}
+
 code {
   font-family:
     source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;

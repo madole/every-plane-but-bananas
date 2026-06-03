@@ -1,4 +1,4 @@
-import { Cartesian3 } from 'cesium'
+import { cartesianFromDegrees } from '../lib/geodetic'
 import { createServerFn } from '@tanstack/react-start'
 import { createLogger } from '../lib/logger'
 import type {
@@ -21,12 +21,11 @@ const DATA_INDEX = {
 const EMPTY_RESULT: AircraftPositionsResult = { positions: [] }
 
 function stateToCartesian(state: OpenSkyState): SerializedCartesian3 {
-  const cartesian = Cartesian3.fromDegrees(
+  return cartesianFromDegrees(
     (state[DATA_INDEX.LONGITUDE] as number | null) ?? 0,
     (state[DATA_INDEX.LATITUDE] as number | null) ?? 0,
     (state[DATA_INDEX.GEO_ALTITUDE] as number | null) ?? 0,
   )
-  return { x: cartesian.x, y: cartesian.y, z: cartesian.z }
 }
 
 function mapStatesToCartesians(states: OpenSkyState[]): SerializedCartesian3[] {

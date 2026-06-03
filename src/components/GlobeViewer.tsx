@@ -23,9 +23,15 @@ import type { SerializedCartesian3 } from '../types/opensky'
 const log = createLogger('globe:client')
 
 const hasIonToken = configureCesiumIon()
-const terrainProvider = createTerrainProvider()
-const fallbackBaseLayer = hasIonToken ? undefined : createFallbackBaseLayer()
 const REFRESH_TIME = OPENSKY_BASE_POLL_MS
+
+function createViewerTerrainProvider() {
+  return createTerrainProvider()
+}
+
+function createViewerFallbackBaseLayer() {
+  return hasIonToken ? undefined : createFallbackBaseLayer()
+}
 
 function readInitialCache() {
   const cached = loadCachedAircraft()
@@ -225,6 +231,8 @@ export function GlobeViewer() {
   const containerRef = useRef<HTMLDivElement>(null)
   const { positions, lastUpdatedAt, isUsingCache } = useAirTrafficData(true)
   const [viewer, setViewer] = useState<CesiumViewer | undefined>(undefined)
+  const terrainProvider = useMemo(() => createViewerTerrainProvider(), [])
+  const fallbackBaseLayer = useMemo(() => createViewerFallbackBaseLayer(), [])
   const globeWarning = useMemo(
     () =>
       hasIonToken

@@ -19,6 +19,15 @@ cp .env.example .env
 | `pnpm preview` | Preview production build |
 | `pnpm test` | Vitest smoke tests |
 
+## Deploy to Netlify
+
+This project uses [`@netlify/vite-plugin-tanstack-start`](https://www.npmjs.com/package/@netlify/vite-plugin-tanstack-start). `netlify.toml` is already configured:
+
+- **Build command:** `pnpm build`
+- **Publish directory:** `dist/client`
+
+Set `VITE_CESIUM_ION_TOKEN` in the Netlify UI under **Site configuration → Environment variables** before deploying.
+
 ## Stack
 
 - [TanStack Start](https://tanstack.com/start) + React 19
