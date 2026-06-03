@@ -6,9 +6,12 @@ import netlify from '@netlify/vite-plugin-tanstack-start'
 
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import cesium from 'vite-plugin-cesium'
+import {
+  cesiumForClientBuild,
+  globeViewerSsrStub,
+} from './src/vite/cesium-for-client-build'
 
-const config = defineConfig({
+export default defineConfig({
   define: {
     CESIUM_BASE_URL: JSON.stringify('/cesium/'),
   },
@@ -19,12 +22,10 @@ const config = defineConfig({
     tanstackStart(),
     viteReact(),
     netlify(),
-    cesium({ rebuildCesium: true }),
+    globeViewerSsrStub(),
+    cesiumForClientBuild(),
   ],
   ssr: {
-    noExternal: ['resium'],
-    external: ['cesium'],
+    external: ['cesium', 'resium'],
   },
 })
-
-export default config
