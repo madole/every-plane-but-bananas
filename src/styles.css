@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+
+body {
+  margin: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu,
+    Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.globe-app {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.globe-viewer {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+}
+
+code {
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+.aircraft-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(20, 24, 28, 0.72);
+  color: #f5f5f5;
+  font-size: 13px;
+  line-height: 1.4;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.aircraft-status__count {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+
+.aircraft-status__updated {
+  margin: 0;
+  color: rgba(245, 245, 245, 0.82);
+}
+
+.aircraft-status__warning {
+  margin: 8px 0 0;
+  color: #ffd166;
+  font-size: 12px;
+}
