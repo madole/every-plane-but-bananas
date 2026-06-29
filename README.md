@@ -49,4 +49,14 @@ Positions come from the [OpenSky Network](https://opensky-network.org/) API by d
 
 The home route uses `ssr: false` because Cesium requires browser APIs.
 
-Aircraft are drawn with a `BillboardCollection` (one banana texture, thousands of billboards) instead of per-aircraft GLTF `Entity` instances. Cesium 1.142 does not yet expose a public API for dynamic instanced GLTF models (`ModelInstanceCollection` was removed; multi-instance `Model.fromGltfAsync` is still in progress upstream).
+Each aircraft is drawn as the actual `banana.gltf` model. To stay performant with
+thousands of aircraft, all bananas render in a **single draw call** via GPU
+instancing: on every data refresh the app builds an in-memory glTF that adds the
+[`EXT_mesh_gpu_instancing`](https://github.com/KhronosGroup/glTF/tree/main/extensions/2.0/Vendor/EXT_mesh_gpu_instancing)
+extension to the banana mesh with one transform per aircraft (see
+`src/lib/banana-instances.ts` and `src/components/BananaAircraftLayer.tsx`).
+Instances are placed directly in ECEF space (so the model loads with
+`upAxis: Axis.Z`, `forwardAxis: Axis.X` and an identity `modelMatrix`), each
+rotated so the banana lies tangent to the globe with its curve facing up. The
+heavy mesh/texture buffer is loaded once into a `Blob` URL so each rebuild only
+re-serializes the small per-instance buffer.
