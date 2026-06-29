@@ -42,10 +42,10 @@ Positions come from the [OpenSky Network](https://opensky-network.org/) API by d
 | Variable | Default | Description |
 | --- | --- | --- |
 | `AIRCRAFT_SOURCE` | `opensky` | Preferred provider (`opensky` or `adsbfi`); the other is the fallback. |
-| `ADSBFI_LAT` / `ADSBFI_LON` | `50` / `8` | Center of the adsb.fi search region (it is radius-based, not global). |
-| `ADSBFI_DIST` | `250` | adsb.fi search radius in nautical miles (250 is the API maximum). |
+| `ADSBFI_LAT` / `ADSBFI_LON` | _(unset)_ | Set BOTH to restrict the adsb.fi fallback to a single region; otherwise it fans out worldwide. |
+| `ADSBFI_DIST` | `250` | Per-query adsb.fi radius in nautical miles (250 is the API maximum). |
 
-> Note: OpenSky's `states/all` endpoint is global, but adsb.fi returns aircraft within a radius, so the fallback shows a regional snapshot. Some networks (e.g. cloud/datacenter IPs) are blocked by OpenSky at the firewall level, in which case the adsb.fi fallback kicks in automatically.
+> Note: OpenSky's `states/all` endpoint is global. adsb.fi is radius-based (max 250 nm per query), so the fallback issues several queries across busy regions worldwide and de-duplicates the results for near-global coverage. Coverage follows the community ADS-B receiver network, so it is dense over populated land and sparse over open ocean. Some networks (e.g. cloud/datacenter IPs) are blocked by OpenSky at the firewall level, in which case the adsb.fi fallback kicks in automatically.
 
 The home route uses `ssr: false` because Cesium requires browser APIs.
 
