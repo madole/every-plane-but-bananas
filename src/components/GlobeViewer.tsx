@@ -17,7 +17,7 @@ import {
   OPENSKY_BASE_POLL_MS,
 } from '../lib/exponential-backoff'
 import { createLogger } from '../lib/logger'
-import { fetchOpenSkyStates } from '../server/opensky'
+import { fetchAircraftPositions } from '../server/aircraft'
 import type { SerializedCartesian3 } from '../types/opensky'
 
 const log = createLogger('globe:client')
@@ -86,7 +86,7 @@ function useAirTrafficData(visible: boolean) {
     log.info('Requesting aircraft data via server function')
 
     try {
-      const response = await fetchOpenSkyStates()
+      const response = await fetchAircraftPositions()
 
       if (response.error) {
         consecutiveFailuresRef.current += 1

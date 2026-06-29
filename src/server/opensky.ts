@@ -1,5 +1,4 @@
 import { cartesianFromDegrees } from '../lib/geodetic'
-import { createServerFn } from '@tanstack/react-start'
 import { createLogger } from '../lib/logger'
 import type {
   AircraftPositionsResult,
@@ -11,6 +10,9 @@ import type {
 const log = createLogger('opensky:server')
 
 const OPEN_SKY_STATES_URL = 'https://opensky-network.org/api/states/all'
+
+/** Abort the request if the upstream stalls, so polling backoff can take over. */
+const REQUEST_TIMEOUT_MS = 8000
 
 const DATA_INDEX = {
   LONGITUDE: 5,
@@ -36,7 +38,7 @@ function failureResult(
   message: string,
   options?: { statusCode?: number; retryAfterSeconds?: number },
 ): AircraftPositionsResult {
-  return { ...EMPTY_RESULT, error: message, ...options }
+  return { ...EMPTY_RESULT, error: message, source: 'opensky', ...options }
 }
 
 function parseRetryAfterSeconds(header: string | null): number | undefined {
@@ -57,64 +59,64 @@ function parseRetryAfterSeconds(header: string | null): number | undefined {
   return Math.max(0, Math.ceil((retryAt - Date.now()) / 1000))
 }
 
-export const fetchOpenSkyStates = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<AircraftPositionsResult> => {
-    const startedAt = performance.now()
-    log.info('Fetching OpenSky states', { url: OPEN_SKY_STATES_URL })
+export async function fetchOpenSkyPositions(): Promise<AircraftPositionsResult> {
+  const startedAt = performance.now()
+  log.info('Fetching OpenSky states', { url: OPEN_SKY_STATES_URL })
 
-    try {
-      const response = await fetch(OPEN_SKY_STATES_URL, {
-        headers: { Accept: 'application/json' },
-      })
+  try {
+    const response = await fetch(OPEN_SKY_STATES_URL, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    })
 
-      const fetchDurationMs = Math.round(performance.now() - startedAt)
+    const fetchDurationMs = Math.round(performance.now() - startedAt)
 
-      if (!response.ok) {
-        const retryAfterSeconds = parseRetryAfterSeconds(
-          response.headers.get('Retry-After'),
-        )
-        const message = `OpenSky request failed: ${response.status}`
-        log.warn(message, {
-          status: response.status,
-          statusText: response.statusText,
-          fetchDurationMs,
-          retryAfterSeconds,
-        })
-        return failureResult(message, {
-          statusCode: response.status,
-          retryAfterSeconds,
-        })
-      }
-
-      const data = (await response.json()) as OpenSkyResponse
-      const states = data.states ?? []
-
-      const mapStartedAt = performance.now()
-      const positions = mapStatesToCartesians(states)
-      const mapDurationMs = Math.round(performance.now() - mapStartedAt)
-      const totalDurationMs = Math.round(performance.now() - startedAt)
-
-      log.info('Mapped aircraft to Cartesian positions', {
-        aircraftCount: states.length,
-        positionCount: positions.length,
-        apiTime: data.time,
+    if (!response.ok) {
+      const retryAfterSeconds = parseRetryAfterSeconds(
+        response.headers.get('Retry-After'),
+      )
+      const message = `OpenSky request failed: ${response.status}`
+      log.warn(message, {
+        status: response.status,
+        statusText: response.statusText,
         fetchDurationMs,
-        mapDurationMs,
-        totalDurationMs,
+        retryAfterSeconds,
       })
-
-      return {
-        apiTime: data.time,
-        positions,
-      }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : 'OpenSky request failed'
-      log.warn('OpenSky unavailable; returning empty aircraft set', {
-        message,
-        durationMs: Math.round(performance.now() - startedAt),
+      return failureResult(message, {
+        statusCode: response.status,
+        retryAfterSeconds,
       })
-      return failureResult(message)
     }
-  },
-)
+
+    const data = (await response.json()) as OpenSkyResponse
+    const states = data.states ?? []
+
+    const mapStartedAt = performance.now()
+    const positions = mapStatesToCartesians(states)
+    const mapDurationMs = Math.round(performance.now() - mapStartedAt)
+    const totalDurationMs = Math.round(performance.now() - startedAt)
+
+    log.info('Mapped aircraft to Cartesian positions', {
+      aircraftCount: states.length,
+      positionCount: positions.length,
+      apiTime: data.time,
+      fetchDurationMs,
+      mapDurationMs,
+      totalDurationMs,
+    })
+
+    return {
+      apiTime: data.time,
+      positions,
+      source: 'opensky',
+    }
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'OpenSky request failed'
+    log.warn('OpenSky unavailable; returning empty aircraft set', {
+      message,
+      durationMs: Math.round(performance.now() - startedAt),
+    })
+    return failureResult(message)
+  }
+}
