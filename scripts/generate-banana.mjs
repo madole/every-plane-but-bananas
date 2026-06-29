@@ -95,8 +95,10 @@ for (let j = 0; j < RADIAL_SEGMENTS; j += 1) {
   indices.push(endTip, a, b)
 }
 
-// Center the geometry on its bounding-box centre so the instance translation
-// places the banana's middle at the aircraft position.
+// Anchor the geometry: centre it horizontally (X = length, Z = thickness) but
+// rest its base on Y = 0. The +Y axis becomes the local "up" (surface normal)
+// at render time, so flooring Y keeps the whole banana above the aircraft point
+// instead of sinking its lower half below the globe surface.
 const min = [Infinity, Infinity, Infinity]
 const max = [-Infinity, -Infinity, -Infinity]
 for (let i = 0; i < positions.length; i += 3) {
@@ -105,15 +107,11 @@ for (let i = 0; i < positions.length; i += 3) {
     max[k] = Math.max(max[k], positions[i + k])
   }
 }
-const center = [
-  (min[0] + max[0]) / 2,
-  (min[1] + max[1]) / 2,
-  (min[2] + max[2]) / 2,
-]
+const offset = [(min[0] + max[0]) / 2, min[1], (min[2] + max[2]) / 2]
 for (let i = 0; i < positions.length; i += 3) {
-  positions[i + 0] -= center[0]
-  positions[i + 1] -= center[1]
-  positions[i + 2] -= center[2]
+  positions[i + 0] -= offset[0]
+  positions[i + 1] -= offset[1]
+  positions[i + 2] -= offset[2]
 }
 
 const posMin = [Infinity, Infinity, Infinity]
