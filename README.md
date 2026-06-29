@@ -33,7 +33,19 @@ Set `VITE_CESIUM_ION_TOKEN` in the Netlify UI under **Site configuration → Env
 - [TanStack Start](https://tanstack.com/start) + React 19
 - [Cesium](https://cesium.com/) + [Resium](https://resium.reearth.io/)
 - [vite-plugin-cesium](https://www.npmjs.com/package/vite-plugin-cesium)
-- OpenSky Network API for aircraft positions (`fetchOpenSkyStates` server function avoids browser CORS)
+- Aircraft positions via the `fetchAircraftPositions` server function (runs server-side to avoid browser CORS)
+
+## Aircraft data sources
+
+Positions come from the [OpenSky Network](https://opensky-network.org/) API by default, with [adsb.fi](https://adsb.fi/) as an automatic fallback when the primary provider is blocked, rate-limited, or returns nothing. Configure with server-side environment variables:
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `AIRCRAFT_SOURCE` | `opensky` | Preferred provider (`opensky` or `adsbfi`); the other is the fallback. |
+| `ADSBFI_LAT` / `ADSBFI_LON` | `50` / `8` | Center of the adsb.fi search region (it is radius-based, not global). |
+| `ADSBFI_DIST` | `250` | adsb.fi search radius in nautical miles (250 is the API maximum). |
+
+> Note: OpenSky's `states/all` endpoint is global, but adsb.fi returns aircraft within a radius, so the fallback shows a regional snapshot. Some networks (e.g. cloud/datacenter IPs) are blocked by OpenSky at the firewall level, in which case the adsb.fi fallback kicks in automatically.
 
 The home route uses `ssr: false` because Cesium requires browser APIs.
 
