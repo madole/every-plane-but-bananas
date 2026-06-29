@@ -18,8 +18,15 @@ const BANANA_MODEL_URL = '/banana.gltf'
 /** Native banana length along its +X axis (from the glTF POSITION accessor). */
 const BANANA_NATIVE_LENGTH_M = 0.2302
 /** Rendered banana length in metres — large enough to spot against the globe. */
-const BANANA_RENDER_LENGTH_M = 60_000
+const BANANA_RENDER_LENGTH_M = 40_000
 const BANANA_SCALE = BANANA_RENDER_LENGTH_M / BANANA_NATIVE_LENGTH_M
+/**
+ * Size of each per-region instanced model's lat/lon cell, in degrees. Kept small
+ * so each model's bounding-sphere centre stays near the globe surface; wide cells
+ * push the centre far underground, where horizon-occlusion culling drops the
+ * whole bucket once the camera descends to medium/close zoom.
+ */
+const BANANA_CELL_DEGREES = 4
 
 type BananaAircraftLayerProps = {
   viewer: CesiumViewer | undefined
@@ -109,9 +116,11 @@ export function BananaAircraftLayer({
     const isStale = () => run.cancelled || viewer.isDestroyed()
     const startedAt = performance.now()
 
-    // One instanced model per regional cell so each bounding volume stays local
-    // and Cesium's culling keeps the bananas visible at every zoom level.
-    const buckets = bucketPositions(positions)
+    // One instanced model per small regional cell. Small cells keep each model's
+    // bounding-sphere centre close to the globe surface (a wide cell's ECEF
+    // bbox-centre sits far underground, which makes Cesium's horizon-occlusion
+    // culling wrongly drop the whole bucket at medium zoom).
+    const buckets = bucketPositions(positions, BANANA_CELL_DEGREES)
     const urls: string[] = []
     const loads = buckets.map((bucket) => {
       const origin = computeBoundingCenter(bucket)
@@ -134,9 +143,6 @@ export function BananaAircraftLayer({
         // textures load before `readyEvent` so swap-in is never untextured.
         asynchronous: true,
         incrementallyLoadTextures: false,
-        // Belt-and-suspenders against Cesium dropping a bucket whose bounding
-        // volume does not fully reflect the instance spread.
-        cull: false,
       })
     })
 
