@@ -1,10 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { fetchOpenSkyStates } from '../server/opensky'
+import { fetchAircraftPositions } from '../server/aircraft'
 import { GlobeViewer } from './GlobeViewer'
 
-vi.mock('../server/opensky', () => ({
-  fetchOpenSkyStates: vi.fn(() =>
+vi.mock('../server/aircraft', () => ({
+  fetchAircraftPositions: vi.fn(() =>
     Promise.resolve({
       apiTime: 1,
       positions: [{ x: -74, y: 40, z: 1000 }],
@@ -39,7 +39,7 @@ vi.mock('cesium', () => ({
 
 describe('GlobeViewer', () => {
   beforeEach(() => {
-    vi.mocked(fetchOpenSkyStates).mockResolvedValue({
+    vi.mocked(fetchAircraftPositions).mockResolvedValue({
       apiTime: 1,
       positions: [{ x: -74, y: 40, z: 1000 }],
     })
@@ -52,8 +52,8 @@ describe('GlobeViewer', () => {
     })
   })
 
-  it('still renders the viewer when OpenSky returns an error', async () => {
-    vi.mocked(fetchOpenSkyStates).mockResolvedValue({
+  it('still renders the viewer when the upstream returns an error', async () => {
+    vi.mocked(fetchAircraftPositions).mockResolvedValue({
       positions: [],
       error: 'OpenSky request failed: 503',
     })
