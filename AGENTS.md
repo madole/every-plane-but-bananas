@@ -46,3 +46,15 @@ skills:
   - when: "TanStack Router bundler plugin for route generation and automatic code splitting. Supports Vite, Webpack, Rspack, and esbuild. Configures autoCodeSplitting, routesDirectory, target framework, and code split groupings."
     use: "@tanstack/router-plugin#router-plugin"
 <!-- intent-skills:end -->
+
+## Cursor Cloud specific instructions
+
+Despite the TanStack skill mappings above (CTA-injected hints), this repo is a **single TanStack Start (React 19) + Cesium app** (`every-plane-but-bananas`), not the TanStack monorepo. There are no workspaces/turbo/nx. Package manager is **pnpm**.
+
+Standard scripts live in `package.json` (`dev`, `build`, `preview`, `test`, `lint`, `format`, `check`). `pnpm dev` serves at http://localhost:3000.
+
+Non-obvious caveats:
+- **OpenSky API is unreachable from the cloud VM (server-side IP block).** Requests to `opensky-network.org` (`194.209.200.34`) complete the TCP handshake but are then reset (`ECONNRESET`) on both port 443 and port 80, regardless of SNI. OpenSky is up and serves data fine from other networks, so this is OpenSky's edge firewall rejecting this datacenter egress IP — **not** the Cursor "allow network activity" toggle and not a code bug. Enabling network access does not change it; fixing it would require OpenSky allowlisting the IP or routing OpenSky traffic through a different (non-blocked) egress. The app degrades gracefully: the globe still renders and the overlay shows `0 bananas in the sky` / `Waiting for aircraft data…`.
+- **No Cesium Ion token by default.** Without `VITE_CESIUM_ION_TOKEN` in `.env`, Cesium uses its default ion token / OSM fallback and the globe still renders (with a token warning in the overlay). `.env` is optional; copy `.env.example` to `.env` and set the token only if you need HD imagery/terrain.
+- The home route is `ssr: false` and the globe needs **WebGL/a real browser**; the large `GlobeViewer` bundle takes ~10–15s to lazy-load on first paint (black screen until then).
+- `pnpm lint` currently reports pre-existing `consistent-type-imports` errors in committed source; they are auto-fixable via `pnpm format` (or `eslint --fix`) and are unrelated to environment setup.
