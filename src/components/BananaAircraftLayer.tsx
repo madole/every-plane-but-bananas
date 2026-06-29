@@ -14,9 +14,9 @@ const log = createLogger('bananas:layer')
 
 const BANANA_MODEL_URL = '/banana.gltf'
 /** Native banana length along its +X axis (from the glTF POSITION accessor). */
-const BANANA_NATIVE_LENGTH_M = 0.2292
+const BANANA_NATIVE_LENGTH_M = 0.2302
 /** Rendered banana length in metres — large enough to spot against the globe. */
-const BANANA_RENDER_LENGTH_M = 150_000
+const BANANA_RENDER_LENGTH_M = 60_000
 const BANANA_SCALE = BANANA_RENDER_LENGTH_M / BANANA_NATIVE_LENGTH_M
 
 type BananaAircraftLayerProps = {
@@ -115,7 +115,9 @@ export function BananaAircraftLayer({
       upAxis: Axis.Z,
       forwardAxis: Axis.X,
       scene: viewer.scene,
-      asynchronous: false,
+      // Load across frames so the 30s rebuild never blocks the main thread;
+      // textures load before `readyEvent` so the swap-in is never untextured.
+      asynchronous: true,
       incrementallyLoadTextures: false,
     })
       .then((model) => {
