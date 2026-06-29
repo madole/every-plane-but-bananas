@@ -1,5 +1,7 @@
 /** Subset of the adsb.fi (readsb-compatible) aircraft record we consume. */
 export type AdsbFiAircraft = {
+  /** 24-bit ICAO address; used to de-duplicate overlapping regional queries. */
+  hex?: string
   lat?: number
   lon?: number
   /** Geometric (WGS84) altitude in feet. */
