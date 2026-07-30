@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bucketPositions,
   buildInstancedBananaGltf,
+  computeBoundingCenter,
   decodeDataUri,
   enuRotationQuaternion,
   packBananaInstances,
@@ -76,6 +78,60 @@ describe('packBananaInstances', () => {
     expect(Array.from(floats.slice(0, 6))).toEqual([1, 2, 3, 4, 5, 6])
     // scales are last: 6 floats all equal to 7
     expect(Array.from(floats.slice(-6))).toEqual([7, 7, 7, 7, 7, 7])
+  })
+
+  it('stores translations relative to a supplied origin', () => {
+    const packed = packBananaInstances([{ x: 100, y: 200, z: 300 }], 1, [
+      100, 200, 300,
+    ])
+    const floats = decodeFloats(packed.base64)
+    expect(Array.from(floats.slice(0, 3))).toEqual([0, 0, 0])
+    expect(packed.translation.min).toEqual([0, 0, 0])
+  })
+})
+
+describe('computeBoundingCenter', () => {
+  it('returns the bounding-box centre', () => {
+    expect(
+      computeBoundingCenter([
+        { x: 0, y: 0, z: 0 },
+        { x: 10, y: 20, z: 30 },
+      ]),
+    ).toEqual([5, 10, 15])
+  })
+
+  it('returns the origin for an empty list', () => {
+    expect(computeBoundingCenter([])).toEqual([0, 0, 0])
+  })
+})
+
+describe('bucketPositions', () => {
+  it('groups far-apart positions into separate regional cells', () => {
+    const europe = cartesianFromDegrees(8, 47, 10000)
+    const australia = cartesianFromDegrees(151, -33, 10000)
+    const buckets = bucketPositions([europe, australia])
+
+    expect(buckets).toHaveLength(2)
+    expect(buckets.flat()).toHaveLength(2)
+  })
+
+  it('keeps nearby positions in the same cell', () => {
+    const a = cartesianFromDegrees(8, 47, 10000)
+    const b = cartesianFromDegrees(9, 48, 11000)
+    const buckets = bucketPositions([a, b])
+
+    expect(buckets).toHaveLength(1)
+    expect(buckets[0]).toHaveLength(2)
+  })
+
+  it('preserves the total number of positions', () => {
+    const positions = [
+      cartesianFromDegrees(8, 47, 0),
+      cartesianFromDegrees(-74, 40, 0),
+      cartesianFromDegrees(139, 35, 0),
+      cartesianFromDegrees(-46, -23, 0),
+    ]
+    expect(bucketPositions(positions).flat()).toHaveLength(4)
   })
 })
 

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Axis, Matrix4, Model } from 'cesium'
+import { Axis, Cartesian3, Matrix4, Model } from 'cesium'
 import type { Viewer as CesiumViewer } from 'cesium'
 import { createLogger } from '../lib/logger'
 import {
+  bucketPositions,
   buildInstancedBananaGltf,
+  computeBoundingCenter,
   decodeDataUri,
   isGltfDocument,
 } from '../lib/banana-instances'
@@ -16,8 +18,15 @@ const BANANA_MODEL_URL = '/banana.gltf'
 /** Native banana length along its +X axis (from the glTF POSITION accessor). */
 const BANANA_NATIVE_LENGTH_M = 0.2302
 /** Rendered banana length in metres — large enough to spot against the globe. */
-const BANANA_RENDER_LENGTH_M = 60_000
+const BANANA_RENDER_LENGTH_M = 40_000
 const BANANA_SCALE = BANANA_RENDER_LENGTH_M / BANANA_NATIVE_LENGTH_M
+/**
+ * Size of each per-region instanced model's lat/lon cell, in degrees. Kept small
+ * so each model's bounding-sphere centre stays near the globe surface; wide cells
+ * push the centre far underground, where horizon-occlusion culling drops the
+ * whole bucket once the camera descends to medium/close zoom.
+ */
+const BANANA_CELL_DEGREES = 4
 
 type BananaAircraftLayerProps = {
   viewer: CesiumViewer | undefined
@@ -34,7 +43,7 @@ export function BananaAircraftLayer({
   positions,
 }: BananaAircraftLayerProps) {
   const [baseGltf, setBaseGltf] = useState<GltfDocument | null>(null)
-  const modelRef = useRef<Model | null>(null)
+  const modelsRef = useRef<Model[]>([])
   const bufferUrlRef = useRef<string | null>(null)
 
   // Load the banana mesh + texture once. The (heavy) embedded buffer is moved to
@@ -92,89 +101,135 @@ export function BananaAircraftLayer({
     if (!viewer || !baseGltf) {
       return
     }
+    const scene = viewer.scene
 
     if (positions.length === 0) {
-      if (modelRef.current) {
-        viewer.scene.primitives.remove(modelRef.current)
-        modelRef.current = null
-        viewer.scene.requestRender()
+      for (const model of modelsRef.current) {
+        scene.primitives.remove(model)
       }
+      modelsRef.current = []
+      scene.requestRender()
       return
     }
 
-    let cancelled = false
+    const run = { cancelled: false }
+    const isStale = () => run.cancelled || viewer.isDestroyed()
     const startedAt = performance.now()
-    const gltf = buildInstancedBananaGltf(baseGltf, positions, BANANA_SCALE)
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(gltf)], { type: 'model/gltf+json' }),
-    )
 
-    Model.fromGltfAsync({
-      url,
-      modelMatrix: Matrix4.IDENTITY,
-      upAxis: Axis.Z,
-      forwardAxis: Axis.X,
-      scene: viewer.scene,
-      // Load across frames so the 30s rebuild never blocks the main thread;
-      // textures load before `readyEvent` so the swap-in is never untextured.
-      asynchronous: true,
-      incrementallyLoadTextures: false,
+    // One instanced model per small regional cell. Small cells keep each model's
+    // bounding-sphere centre close to the globe surface (a wide cell's ECEF
+    // bbox-centre sits far underground, which makes Cesium's horizon-occlusion
+    // culling wrongly drop the whole bucket at medium zoom).
+    const buckets = bucketPositions(positions, BANANA_CELL_DEGREES)
+    const urls: string[] = []
+    const loads = buckets.map((bucket) => {
+      const origin = computeBoundingCenter(bucket)
+      const gltf = buildInstancedBananaGltf(baseGltf, bucket, BANANA_SCALE, origin)
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(gltf)], { type: 'model/gltf+json' }),
+      )
+      urls.push(url)
+      return Model.fromGltfAsync({
+        url,
+        // Position the bucket at its centroid so the bounding volume is local
+        // (instance translations are stored relative to this origin).
+        modelMatrix: Matrix4.fromTranslation(
+          new Cartesian3(origin[0], origin[1], origin[2]),
+        ),
+        upAxis: Axis.Z,
+        forwardAxis: Axis.X,
+        scene,
+        // Load across frames so the 30s rebuild never blocks the main thread;
+        // textures load before `readyEvent` so swap-in is never untextured.
+        asynchronous: true,
+        incrementallyLoadTextures: false,
+      })
     })
-      .then((model) => {
-        if (cancelled || viewer.isDestroyed()) {
-          URL.revokeObjectURL(url)
-          return
-        }
 
-        viewer.scene.primitives.add(model)
-
-        const swapInModel = () => {
-          if (modelRef.current && modelRef.current !== model) {
-            viewer.scene.primitives.remove(modelRef.current)
-          }
-          modelRef.current = model
-          viewer.scene.requestRender()
-          URL.revokeObjectURL(url)
-          log.info('Instanced banana model ready', {
-            count: positions.length,
-            durationMs: Math.round(performance.now() - startedAt),
-          })
-        }
-
-        if (model.ready) {
-          swapInModel()
-          return
-        }
+    const whenReady = (model: Model): Promise<void> => {
+      if (model.ready) {
+        return Promise.resolve()
+      }
+      return new Promise((resolve) => {
         const removeListener = model.readyEvent.addEventListener(() => {
           removeListener()
-          if (cancelled || viewer.isDestroyed()) {
-            viewer.scene.primitives.remove(model)
-            URL.revokeObjectURL(url)
-            return
+          resolve()
+        })
+      })
+    }
+
+    const revokeUrls = () => urls.forEach((url) => URL.revokeObjectURL(url))
+
+    Promise.allSettled(loads)
+      .then(async (results) => {
+        const models = results
+          .filter(
+            (result): result is PromiseFulfilledResult<Model> =>
+              result.status === 'fulfilled',
+          )
+          .map((result) => result.value)
+
+        const failures = results.length - models.length
+        if (failures > 0) {
+          log.warn('Some banana buckets failed to load', { failures })
+        }
+
+        if (isStale()) {
+          for (const model of models) {
+            model.destroy()
           }
-          swapInModel()
+          revokeUrls()
+          return
+        }
+
+        for (const model of models) {
+          scene.primitives.add(model)
+        }
+        await Promise.all(models.map(whenReady))
+
+        if (isStale()) {
+          for (const model of models) {
+            scene.primitives.remove(model)
+          }
+          revokeUrls()
+          return
+        }
+
+        const previous = modelsRef.current
+        modelsRef.current = models
+        for (const model of previous) {
+          scene.primitives.remove(model)
+        }
+        revokeUrls()
+        scene.requestRender()
+        log.info('Instanced banana models ready', {
+          buckets: models.length,
+          count: positions.length,
+          durationMs: Math.round(performance.now() - startedAt),
         })
       })
       .catch((error: unknown) => {
-        URL.revokeObjectURL(url)
-        if (!cancelled) {
-          log.error('Failed to build instanced banana model', {
+        revokeUrls()
+        if (!run.cancelled) {
+          log.error('Failed to build instanced banana models', {
             message: error instanceof Error ? error.message : String(error),
           })
         }
       })
 
     return () => {
-      cancelled = true
+      run.cancelled = true
     }
   }, [viewer, baseGltf, positions])
 
   useEffect(() => {
     return () => {
-      if (viewer && !viewer.isDestroyed() && modelRef.current) {
-        viewer.scene.primitives.remove(modelRef.current)
+      if (viewer && !viewer.isDestroyed()) {
+        for (const model of modelsRef.current) {
+          viewer.scene.primitives.remove(model)
+        }
       }
-      modelRef.current = null
+      modelsRef.current = []
     }
   }, [viewer])
 

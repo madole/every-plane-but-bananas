@@ -168,6 +168,26 @@ function uint8ToBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
+/** Bounding-box centre of the positions, used as a model's local origin. */
+export function computeBoundingCenter(
+  positions: SerializedCartesian3[],
+): Vec3 {
+  if (positions.length === 0) {
+    return [0, 0, 0]
+  }
+  const min: Vec3 = [Infinity, Infinity, Infinity]
+  const max: Vec3 = [-Infinity, -Infinity, -Infinity]
+  for (const { x, y, z } of positions) {
+    min[0] = Math.min(min[0], x)
+    min[1] = Math.min(min[1], y)
+    min[2] = Math.min(min[2], z)
+    max[0] = Math.max(max[0], x)
+    max[1] = Math.max(max[1], y)
+    max[2] = Math.max(max[2], z)
+  }
+  return [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2]
+}
+
 export type InstanceBuffer = {
   base64: string
   byteLength: number
@@ -179,11 +199,15 @@ export type InstanceBuffer = {
 
 /**
  * Pack per-instance TRANSLATION (VEC3), ROTATION (VEC4 quaternion) and SCALE
- * (VEC3) into a single tightly-packed little-endian float buffer.
+ * (VEC3) into a single tightly-packed little-endian float buffer. Translations
+ * are stored relative to `origin` (the model's local origin) so the model can be
+ * positioned with a `modelMatrix`, keeping its bounding volume local; rotations
+ * still use absolute positions to derive the local surface normal.
  */
 export function packBananaInstances(
   positions: SerializedCartesian3[],
   scale: number,
+  origin: Vec3 = [0, 0, 0],
 ): InstanceBuffer {
   const count = positions.length
   const translationBytes = count * 3 * 4
@@ -205,16 +229,19 @@ export function packBananaInstances(
 
   for (let i = 0; i < count; i += 1) {
     const { x, y, z } = positions[i]
-    translations[i * 3 + 0] = x
-    translations[i * 3 + 1] = y
-    translations[i * 3 + 2] = z
+    const tx = x - origin[0]
+    const ty = y - origin[1]
+    const tz = z - origin[2]
+    translations[i * 3 + 0] = tx
+    translations[i * 3 + 1] = ty
+    translations[i * 3 + 2] = tz
 
-    min[0] = Math.min(min[0], x)
-    min[1] = Math.min(min[1], y)
-    min[2] = Math.min(min[2], z)
-    max[0] = Math.max(max[0], x)
-    max[1] = Math.max(max[1], y)
-    max[2] = Math.max(max[2], z)
+    min[0] = Math.min(min[0], tx)
+    min[1] = Math.min(min[1], ty)
+    min[2] = Math.min(min[2], tz)
+    max[0] = Math.max(max[0], tx)
+    max[1] = Math.max(max[1], ty)
+    max[2] = Math.max(max[2], tz)
 
     const [qx, qy, qz, qw] = enuRotationQuaternion(x, y, z)
     rotations[i * 4 + 0] = qx
@@ -242,6 +269,34 @@ export function packBananaInstances(
   }
 }
 
+/**
+ * Group positions into coarse lat/lon cells. A single globe-spanning instanced
+ * model has a globe-sized bounding volume, which breaks Cesium's frustum and
+ * horizon-occlusion culling (all bananas vanish when zoomed in). Rendering one
+ * instanced model per regional cell keeps each bounding volume local so culling
+ * behaves correctly, while still using only a handful of instanced draw calls.
+ */
+export function bucketPositions(
+  positions: SerializedCartesian3[],
+  cellDegrees = 30,
+): SerializedCartesian3[][] {
+  const buckets = new Map<string, SerializedCartesian3[]>()
+  const radToDeg = 180 / Math.PI
+  for (const position of positions) {
+    const { x, y, z } = position
+    const lon = Math.atan2(y, x) * radToDeg
+    const lat = Math.atan2(z, Math.hypot(x, y)) * radToDeg
+    const key = `${Math.floor(lon / cellDegrees)}:${Math.floor(lat / cellDegrees)}`
+    const existing = buckets.get(key)
+    if (existing) {
+      existing.push(position)
+    } else {
+      buckets.set(key, [position])
+    }
+  }
+  return [...buckets.values()]
+}
+
 function findMeshNodeIndex(nodes: GltfNode[]): number {
   const index = nodes.findIndex((node) => typeof node.mesh === 'number')
   return index === -1 ? 0 : index
@@ -255,8 +310,9 @@ export function buildInstancedBananaGltf(
   base: GltfDocument,
   positions: SerializedCartesian3[],
   scale: number,
+  origin: Vec3 = [0, 0, 0],
 ): GltfDocument {
-  const instances = packBananaInstances(positions, scale)
+  const instances = packBananaInstances(positions, scale, origin)
 
   const bufferIndex = base.buffers.length
   const bufferViewBase = base.bufferViews.length
