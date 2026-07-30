@@ -5,7 +5,7 @@ import type { AdsbFiAircraft } from '../types/adsbfi'
 import type {
   AircraftPositionsResult,
   SerializedCartesian3,
-} from '../types/opensky'
+} from '../types/aircraft'
 
 const log = createLogger('adsbfi:server')
 

@@ -1,4 +1,4 @@
-import type { SerializedCartesian3 } from '../types/opensky'
+import type { SerializedCartesian3 } from '../types/aircraft'
 
 const STORAGE_KEY = 'every-plane-but-bananas:aircraft-cache'
 

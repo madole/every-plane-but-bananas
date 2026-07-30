@@ -1,4 +1,4 @@
-import type { SerializedCartesian3 } from '../types/opensky'
+import type { SerializedCartesian3 } from '../types/aircraft'
 
 /** WGS84 semi-major axis squared (m²). */
 const WGS84_RADII_SQUARED_X = 6378137.0 * 6378137.0

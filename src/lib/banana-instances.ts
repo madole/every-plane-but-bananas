@@ -1,4 +1,4 @@
-import type { SerializedCartesian3 } from '../types/opensky'
+import type { SerializedCartesian3 } from '../types/aircraft'
 
 /**
  * Builds a GPU-instanced banana glTF from aircraft positions using the

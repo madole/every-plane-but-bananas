@@ -1,31 +1,31 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  nextOpenSkyPollDelayMs,
-  OPENSKY_BASE_POLL_MS,
-  OPENSKY_MAX_BACKOFF_MS,
+  nextAircraftPollDelayMs,
+  AIRCRAFT_BASE_POLL_MS,
+  AIRCRAFT_MAX_BACKOFF_MS,
 } from './exponential-backoff'
 
-describe('nextOpenSkyPollDelayMs', () => {
+describe('nextAircraftPollDelayMs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('returns the base interval when there are no failures', () => {
-    expect(nextOpenSkyPollDelayMs(0)).toBe(OPENSKY_BASE_POLL_MS)
+    expect(nextAircraftPollDelayMs(0)).toBe(AIRCRAFT_BASE_POLL_MS)
   })
 
-  it('doubles delay on each consecutive failure up to the cap', () => {
+  it('doubles the delay per consecutive failure up to the max', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
-    expect(nextOpenSkyPollDelayMs(1)).toBe(OPENSKY_BASE_POLL_MS * 2)
-    expect(nextOpenSkyPollDelayMs(2)).toBe(OPENSKY_BASE_POLL_MS * 4)
-    expect(nextOpenSkyPollDelayMs(3)).toBe(OPENSKY_BASE_POLL_MS * 8)
-    expect(nextOpenSkyPollDelayMs(10)).toBe(OPENSKY_MAX_BACKOFF_MS)
-
-    vi.restoreAllMocks()
+    expect(nextAircraftPollDelayMs(1)).toBe(AIRCRAFT_BASE_POLL_MS * 2)
+    expect(nextAircraftPollDelayMs(2)).toBe(AIRCRAFT_BASE_POLL_MS * 4)
+    expect(nextAircraftPollDelayMs(3)).toBe(AIRCRAFT_BASE_POLL_MS * 8)
+    expect(nextAircraftPollDelayMs(10)).toBe(AIRCRAFT_MAX_BACKOFF_MS)
   })
 
-  it('honors Retry-After when it exceeds exponential delay', () => {
+  it('honors a Retry-After hint when it exceeds the exponential delay', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
 
-    expect(nextOpenSkyPollDelayMs(1, 120)).toBe(120_000)
-
-    vi.restoreAllMocks()
+    expect(nextAircraftPollDelayMs(1, 120)).toBe(120_000)
   })
 })

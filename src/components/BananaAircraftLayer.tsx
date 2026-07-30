@@ -10,7 +10,7 @@ import {
   isGltfDocument,
 } from '../lib/banana-instances'
 import type { GltfDocument } from '../lib/banana-instances'
-import type { SerializedCartesian3 } from '../types/opensky'
+import type { SerializedCartesian3 } from '../types/aircraft'
 
 const log = createLogger('bananas:layer')
 

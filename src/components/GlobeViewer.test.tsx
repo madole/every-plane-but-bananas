@@ -55,7 +55,7 @@ describe('GlobeViewer', () => {
   it('still renders the viewer when the upstream returns an error', async () => {
     vi.mocked(fetchAircraftPositions).mockResolvedValue({
       positions: [],
-      error: 'OpenSky request failed: 503',
+      error: 'Aviationstack request failed: 503',
     })
 
     render(<GlobeViewer />)

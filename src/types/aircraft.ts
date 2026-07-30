@@ -1,10 +1,3 @@
-export type OpenSkyState = (number | string | null)[]
-
-export type OpenSkyResponse = {
-  time?: number
-  states: OpenSkyState[] | null
-}
-
 /** JSON-serializable Cartesian3 for RPC from server to client. */
 export type SerializedCartesian3 = {
   x: number
@@ -13,7 +6,7 @@ export type SerializedCartesian3 = {
 }
 
 /** Upstream aircraft data providers, in order of preference. */
-export type AircraftSource = 'opensky' | 'adsbfi'
+export type AircraftSource = 'aviationstack' | 'adsbfi'
 
 export type AircraftPositionsResult = {
   apiTime?: number

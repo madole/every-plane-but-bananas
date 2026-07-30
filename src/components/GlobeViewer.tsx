@@ -13,17 +13,17 @@ import {
   createTerrainProvider,
 } from '../lib/cesium-setup'
 import {
-  nextOpenSkyPollDelayMs,
-  OPENSKY_BASE_POLL_MS,
+  nextAircraftPollDelayMs,
+  AIRCRAFT_BASE_POLL_MS,
 } from '../lib/exponential-backoff'
 import { createLogger } from '../lib/logger'
 import { fetchAircraftPositions } from '../server/aircraft'
-import type { SerializedCartesian3 } from '../types/opensky'
+import type { SerializedCartesian3 } from '../types/aircraft'
 
 const log = createLogger('globe:client')
 
 const hasIonToken = configureCesiumIon()
-const REFRESH_TIME = OPENSKY_BASE_POLL_MS
+const REFRESH_TIME = AIRCRAFT_BASE_POLL_MS
 
 function createViewerTerrainProvider() {
   return createTerrainProvider()
@@ -90,7 +90,7 @@ function useAirTrafficData(visible: boolean) {
 
       if (response.error) {
         consecutiveFailuresRef.current += 1
-        const nextPollMs = nextOpenSkyPollDelayMs(
+        const nextPollMs = nextAircraftPollDelayMs(
           consecutiveFailuresRef.current,
           response.retryAfterSeconds,
         )
@@ -130,7 +130,7 @@ function useAirTrafficData(visible: boolean) {
       scheduleNextPoll(REFRESH_TIME)
     } catch (error: unknown) {
       consecutiveFailuresRef.current += 1
-      const nextPollMs = nextOpenSkyPollDelayMs(consecutiveFailuresRef.current)
+      const nextPollMs = nextAircraftPollDelayMs(consecutiveFailuresRef.current)
       const message = error instanceof Error ? error.message : String(error)
 
       log.warn('Aircraft fetch rejected unexpectedly; globe unchanged', {

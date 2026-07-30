@@ -7,7 +7,8 @@ TanStack Start app showing live aircraft positions on a Cesium globe, each rende
 ```bash
 pnpm install
 cp .env.example .env
-# Set VITE_CESIUM_ION_TOKEN in .env — https://cesium.com/ion/tokens
+# Set AVIATIONSTACK_ACCESS_KEY — https://aviationstack.com/dashboard
+# Optionally set VITE_CESIUM_ION_TOKEN — https://cesium.com/ion/tokens
 ```
 
 ## Scripts
@@ -26,7 +27,7 @@ This project uses [`@netlify/vite-plugin-tanstack-start`](https://www.npmjs.com/
 - **Build command:** `pnpm build`
 - **Publish directory:** `dist/client`
 
-Set `VITE_CESIUM_ION_TOKEN` in the Netlify UI under **Site configuration → Environment variables** before deploying.
+Set `AVIATIONSTACK_ACCESS_KEY` (and optionally `VITE_CESIUM_ION_TOKEN`) in the Netlify UI under **Site configuration → Environment variables** before deploying.
 
 ## Stack
 
@@ -37,15 +38,18 @@ Set `VITE_CESIUM_ION_TOKEN` in the Netlify UI under **Site configuration → Env
 
 ## Aircraft data sources
 
-Positions come from the [OpenSky Network](https://opensky-network.org/) API by default, with [adsb.fi](https://adsb.fi/) as an automatic fallback when the primary provider is blocked, rate-limited, or returns nothing. Configure with server-side environment variables:
+Positions come from the [Aviationstack](https://aviationstack.com/) `/v1/flights` API by default (`flight_status=active`, mapping flights with live geolocation), with [adsb.fi](https://adsb.fi/) as an automatic fallback when the primary provider is blocked, rate-limited, misconfigured, or returns nothing. Configure with server-side environment variables:
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `AIRCRAFT_SOURCE` | `opensky` | Preferred provider (`opensky` or `adsbfi`); the other is the fallback. |
+| `AVIATIONSTACK_ACCESS_KEY` | _(required)_ | Aviationstack API access key. |
+| `AVIATIONSTACK_BASE_URL` | `https://api.aviationstack.com/v1/flights` | Override the flights endpoint (free-tier accounts may need `http://…`). |
+| `AVIATIONSTACK_LIMIT` | `100` | Results per request (Aviationstack max is 100). |
+| `AIRCRAFT_SOURCE` | `aviationstack` | Preferred provider (`aviationstack` or `adsbfi`); the other is the fallback. |
 | `ADSBFI_LAT` / `ADSBFI_LON` | _(unset)_ | Set BOTH to restrict the adsb.fi fallback to a single region; otherwise it fans out worldwide. |
 | `ADSBFI_DIST` | `250` | Per-query adsb.fi radius in nautical miles (250 is the API maximum). |
 
-> Note: OpenSky's `states/all` endpoint is global. adsb.fi is radius-based (max 250 nm per query), so the fallback issues several queries across busy regions worldwide and de-duplicates the results for near-global coverage. Coverage follows the community ADS-B receiver network, so it is dense over populated land and sparse over open ocean. Some networks (e.g. cloud/datacenter IPs) are blocked by OpenSky at the firewall level, in which case the adsb.fi fallback kicks in automatically.
+> Note: Aviationstack returns a paginated slice of active flights (max 100 per request); only flights with a non-null `live` position are plotted. adsb.fi is radius-based (max 250 nm per query), so the fallback issues several queries across busy regions worldwide and de-duplicates the results for near-global coverage.
 
 The home route uses `ssr: false` because Cesium requires browser APIs.
 
